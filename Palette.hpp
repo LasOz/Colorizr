@@ -20,7 +20,11 @@ public:
 
     Palette(char const * file_open);
 
+    void add(cv::Scalar & entry);
+
     size_t size();
+
+    std::vector<cv::Scalar> palette();
 
     cv::Scalar nearest(cv::Scalar & colour, unsigned short p_norm);
 

@@ -1,11 +1,9 @@
 #include "Palette.hpp"
+#include <bitset>
 
 Palette::Palette()
 {
-    colours = std::vector<cv::Scalar>(3);
-    colours.push_back(cv::Scalar(0, 0, 255));
-    colours.push_back(cv::Scalar(0, 255, 0));
-    colours.push_back(cv::Scalar(255, 0, 0));
+    colours = std::vector<cv::Scalar>();
 }
 
 Palette::Palette(char const * file_open)
@@ -29,9 +27,19 @@ Palette::Palette(char const * file_open)
     file.close();
 }
 
+void Palette::add(cv::Scalar & entry)
+{
+    colours.push_back(entry);
+}
+
 size_t Palette::size()
 {
     return Palette::colours.size();
+}
+
+std::vector<cv::Scalar> Palette::palette()
+{
+    return Palette::colours;
 }
 
 cv::Scalar Palette::nearest(cv::Scalar & colour, unsigned short p_norm)
@@ -57,15 +65,13 @@ cv::Scalar Palette::nearest(cv::Scalar & colour, unsigned short p_norm)
 
 unsigned int Palette::scalar2int(cv::Scalar & colour)
 {
-    std::cout << "Scalar values " << colour[0] << " " << colour[1] << " " << colour[2] << std::endl;
     int result = (uchar)colour[0];
     result = (result << 8) | (uchar)colour[1];
     result = (result << 8) | (uchar)colour[2];
-    return result<<=24;
+    return result;
 }
 
 cv::Scalar Palette::int2scalar(int colour)
 {
-    std::cout << "Int values " << (uchar)((colour && 16711680) >> 16) << " " << (uchar)((colour && 65280) >> 8) << " " << (uchar)(colour && 255) << std::endl;
-    return cv::Scalar((uchar)((colour && 16711680) >> 16), (uchar)((colour && 65280 ) >> 8), (uchar)(colour && 255));
+    return cv::Scalar((uchar)((colour & 16711680) >> 16), (uchar)((colour & 65280 ) >> 8), (uchar)(colour & 255));
 }

@@ -7,6 +7,8 @@
 
 #include <string.h>
 #include <unordered_map>
+#include <algorithm>
+
 #include "tinyfiledialogs.h"
 #include "palette.hpp"
 
@@ -14,6 +16,10 @@ struct colourbin {
     cv::Scalar colour;
     unsigned int count;
 };
+
+void assign_palette(cv::Mat & image, Palette & palette, unsigned short p_norm);
+
+bool sort(colourbin first, colourbin second) { return first.count > second.count; }
 
 void extra_filters(cv::Mat &image, char const * folder);
 
@@ -62,6 +68,19 @@ int main(int argc, char *argv[])
     return EXIT_SUCCESS;
 }
 
+void assign_palette(cv::Mat & image, Palette & palette, unsigned short p_norm)
+{
+    for (int j = 0; j < image.rows; ++j)
+        for (int i = 0; i < image.cols; ++i)
+        {
+            cv::Vec3b image_pixel_colour = image.at<cv::Vec3b>(j, i);
+            cv::Scalar nearest = palette.nearest(cv::Scalar(image_pixel_colour), p_norm);
+            image.at<cv::Vec3b>(j, i)[0] = nearest[0];
+            image.at<cv::Vec3b>(j, i)[1] = nearest[1];
+            image.at<cv::Vec3b>(j, i)[2] = nearest[2];
+        }
+}
+
 void extra_filters(cv::Mat & image, char const * folder)
 {
     cv::Mat output, palette_mat;
@@ -72,13 +91,22 @@ void extra_filters(cv::Mat & image, char const * folder)
 
     Palette NES(file_open);
 
-    NN_Palette_Reduction(image, NES, 2);
+    std::vector<colourbin> used_palette = NN_Palette_Reduction(image, NES, 2);
     // Change colours to nearest NES Counter parts (Patlette Reduce), Pixel by pixel using NN assign.
     // Return the palette that is used.
 
+    std::sort(used_palette.begin(), used_palette.end(), sort);
     // Sort the palette from most used to least used (requires making a structure to hold a colour histogram)
 
+    Palette new_palette;
+
+    for (int i = 0; (i < used_palette.size()) && (i < 25); i++)
+        new_palette.add(used_palette[i].colour);
+    
+    std::cout << "New palette size: " << new_palette.size();
+
     // Count colours, if >25 (of some other number) reduce by using only the 25 most used colours from previous palette
+    assign_palette(image, new_palette, 2);
 
     // Go into each 8x8 space and reduce colours to 4
 
@@ -87,13 +115,26 @@ void extra_filters(cv::Mat & image, char const * folder)
 
 std::vector<colourbin> NN_Palette_Reduction(cv::Mat & image, Palette & palette, unsigned short p_norm)
 {
+    std::unordered_map<int, int> count_map(palette.size());
+
     for (int j = 0; j < image.rows; ++j)
         for (int i = 0; i < image.cols; ++i)
         {
             cv::Vec3b image_pixel_colour = image.at<cv::Vec3b>(j, i);
-            std::cout << "before " << palette.nearest(cv::Scalar(image_pixel_colour), p_norm) << std::endl;
-            std::cout << "after " << Palette::int2scalar(Palette::scalar2int(palette.nearest(cv::Scalar(image_pixel_colour), p_norm))) << std::endl;
-            //Use the conversion with a hash map.
+            count_map[Palette::scalar2int(palette.nearest(cv::Scalar(image_pixel_colour), p_norm))]++;
         }
-    return std::vector<colourbin>();
+
+    std::vector<cv::Scalar> colours = palette.palette();
+    std::vector<colourbin> output;
+
+    for (int i = 0; i < colours.size(); i++)
+        if (count_map[Palette::scalar2int(colours[i])] != 0)
+        {
+            colourbin entry;
+            entry.colour = colours[i];
+            entry.count = count_map[Palette::scalar2int(colours[i])];
+            output.push_back(entry);
+        }
+
+    return output;
 }
