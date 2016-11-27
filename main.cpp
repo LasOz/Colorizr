@@ -8,8 +8,16 @@
 #include <string.h>
 #include <unordered_map>
 #include "tinyfiledialogs.h"
+#include "palette.hpp"
+
+struct colourbin {
+    cv::Scalar colour;
+    unsigned int count;
+};
 
 void extra_filters(cv::Mat &image, char const * folder);
+
+std::vector<colourbin> NN_Palette_Reduction(cv::Mat &image, Palette &palette, unsigned short p_norm);
 
 int main(int argc, char *argv[])
 {
@@ -39,8 +47,12 @@ int main(int argc, char *argv[])
     else
         tinyfd_messageBox("Bad file name!", "Could not read image, due to incorrect file name", "ok", "error", 1);
 
-    //im_color = cv::imread(file_open, cv::IMREAD_COLOR);
-    //extra_filters(im_color, folder);
+    im_color = cv::imread(file_open, cv::IMREAD_COLOR);
+    extra_filters(im_color, folder);
+    std::stringstream name;
+    name << folder << "//" << "test" << ".png";
+    if (!cv::imwrite(name.str(), im_color))
+        tinyfd_messageBox("Critical error!", "Something went wrong when trying to save", "ok", "error", 1);
 
     //Forgive this concatenation through conversion. Getting undefined behaviour with strcat
     std::string s1("Pictures saved successfully to:\n");
@@ -55,6 +67,12 @@ void extra_filters(cv::Mat & image, char const * folder)
     cv::Mat output, palette_mat;
     cv::resize(image, image, cv::Size(256, 240), 0, 0, cv::INTER_NEAREST);
 
+    char const * lFilterPatterns[2] = { "*.csv", "*.txt" };
+    char const * file_open = tinyfd_openFileDialog("Choose your palette", "", 2, lFilterPatterns, "Text files (.csv, .txt)", false);
+
+    Palette NES(file_open);
+
+    NN_Palette_Reduction(image, NES, 2);
     // Change colours to nearest NES Counter parts (Patlette Reduce), Pixel by pixel using NN assign.
     // Return the palette that is used.
 
@@ -65,4 +83,17 @@ void extra_filters(cv::Mat & image, char const * folder)
     // Go into each 8x8 space and reduce colours to 4
 
     //palette_reduce(image, output, palette_mat, 25);
+}
+
+std::vector<colourbin> NN_Palette_Reduction(cv::Mat & image, Palette & palette, unsigned short p_norm)
+{
+    for (int j = 0; j < image.rows; ++j)
+        for (int i = 0; i < image.cols; ++i)
+        {
+            cv::Vec3b image_pixel_colour = image.at<cv::Vec3b>(j, i);
+            std::cout << "before " << palette.nearest(cv::Scalar(image_pixel_colour), p_norm) << std::endl;
+            std::cout << "after " << Palette::int2scalar(Palette::scalar2int(palette.nearest(cv::Scalar(image_pixel_colour), p_norm))) << std::endl;
+            //Use the conversion with a hash map.
+        }
+    return std::vector<colourbin>();
 }
